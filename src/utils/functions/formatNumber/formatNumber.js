@@ -1,14 +1,14 @@
 import { simboloMoneda } from "../../../services/global";
 
 export function formatThousandsSeparator(value, money) {
-  return !Number.isNaN(parseFloat(value))
-    ? `${money ? simboloMoneda : ""} ${value}`.replace(
-        /\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g,
-        ","
-      )
-    : money
-    ? simboloMoneda
-    : "";
+  if (Number.isNaN(parseFloat(value))) {
+    return money ? simboloMoneda : "";
+  }
+
+  const fixedValue = parseFloat(value).toFixed(2);
+  const formattedValue = fixedValue.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+  return money ? `${simboloMoneda} ${formattedValue}` : formattedValue;
 }
 
 export function formatRoundedNumber(value) {
@@ -27,23 +27,17 @@ export function formatRoundedNumber(value) {
 
     // Ajustar las decimales si es necesario
     if (decimales >= 10) {
-      if (segundoDigito < 5) {
+      if (segundoDigito <= 5) {
         // Redondear hacia abajo al múltiplo de 10 más cercano
         decimales = Math.floor(decimales / 10) * 10;
-      } else if (segundoDigito === 5 && decimales % 10 === 5) {
-        // Mantener el segundo dígito igual a 5 si el primer decimal es 5
-        decimales = Math.floor(decimales / 10) * 10 + 5;
       } else {
         // Redondear hacia arriba al múltiplo de 10 más cercano
         decimales = Math.ceil(decimales / 10) * 10;
       }
     } else {
-      if (decimales < 5) {
+      if (decimales <= 5) {
         // Redondear hacia abajo al múltiplo de 10 más cercano
         decimales = Math.floor(decimales / 10) * 10;
-      } else if (decimales === 5) {
-        // Mantener el segundo dígito igual a 5 si el primer decimal es 5
-        decimales = Math.floor(decimales / 10) * 10 + 5;
       } else {
         // Redondear hacia arriba al múltiplo de 10 más cercano
         decimales = Math.ceil(decimales / 10) * 10;
