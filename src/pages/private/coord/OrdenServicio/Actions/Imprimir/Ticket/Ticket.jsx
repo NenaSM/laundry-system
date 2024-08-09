@@ -18,8 +18,11 @@ import axios from "axios";
 import {
   nameImpuesto,
   politicaAbandono,
+  showPuntosOnTicket,
+  simboloMoneda,
 } from "../../../../../../../services/global";
 import { useSelector } from "react-redux";
+import { Notify } from "../../../../../../../utils/notify/Notify";
 
 const Ticket = React.forwardRef((props, ref) => {
   const sizePaper80 = true;
@@ -29,6 +32,7 @@ const Ticket = React.forwardRef((props, ref) => {
   const [infoPuntosCli, setInfoPuntosCli] = useState(null);
 
   const InfoServicios = useSelector((state) => state.servicios.listServicios);
+  const ListClientes = useSelector((state) => state.clientes.listClientes);
   const InfoCategorias = useSelector(
     (state) => state.categorias.listCategorias
   );
@@ -44,7 +48,7 @@ const Ticket = React.forwardRef((props, ref) => {
   };
 
   const montoDelivery = () => {
-    return infoOrden.Items.find((p) => p.item === "Delivery").total;
+    return infoOrden.Items.find((p) => p.item === "Delivery")?.total || 0;
   };
 
   const calcularFechaFutura = (numeroDeDias) => {
@@ -62,26 +66,16 @@ const Ticket = React.forwardRef((props, ref) => {
       );
       return response.data;
     } catch (error) {
+      Notify(
+        "CUPON ENTREGADO NO ENCONTRADO",
+        "Promocion fue Eliminada",
+        "warning"
+      );
+
       // Maneja los errores aquí
       console.error(
         `No se pudo obtener información de la promoción - ${error}`
       );
-      throw error; // Lanza el error para que pueda ser capturado por Promise.all
-    }
-  };
-
-  const handleGetInfoPuntosCliente = async (dni) => {
-    try {
-      const response = await axios.get(
-        `${
-          import.meta.env.VITE_BACKEND_URL
-        }/api/lava-ya/get-specific-cliente/${dni}`
-      );
-      return response.data;
-    } catch (error) {
-      // Maneja los errores aquí
-      console.error(`No se pudo obtener información de la puntos - ${error}`);
-      throw error; // Lanza el error para que pueda ser capturado por Promise.all
     }
   };
 
@@ -137,45 +131,36 @@ const Ticket = React.forwardRef((props, ref) => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (infoOrden?.gift_promo.length > 0) {
-        const promos = infoOrden.gift_promo;
-
-        try {
+      setSPago(handleGetInfoPago(infoOrden.ListPago, infoOrden.totalNeto));
+      if (infoOrden) {
+        if (infoOrden?.gift_promo.length > 0) {
           const results = await Promise.all(
-            promos.map(async (promo) => {
-              return await handleGetInfoPromo(promo.codigoCupon);
+            infoOrden.gift_promo.map(async (promo) => {
+              try {
+                return await handleGetInfoPromo(promo.codigoCupon);
+              } catch {
+                return null; // Retorna null si hay un error
+              }
             })
           );
 
-          setListPromos(results);
-        } catch (error) {
-          console.error(
-            "Error al obtener información de las promociones:",
-            error
-          );
-        }
-      }
-      if (
-        infoOrden?.descuento > 0 &&
-        infoOrden?.dni &&
-        infoOrden?.modoDescuento === "Puntos"
-      ) {
-        try {
-          const res = await handleGetInfoPuntosCliente(infoOrden?.dni);
-          setInfoPuntosCli(res);
-        } catch (error) {
-          console.error("Error al obtener información de las Puntos :", error);
+          // Filtrar resultados no válidos
+          setListPromos(results.filter((result) => result));
         }
       }
     };
 
     fetchData();
   }, [infoOrden]);
+
   useEffect(() => {
-    if (infoOrden) {
-      setSPago(handleGetInfoPago(infoOrden.ListPago, infoOrden.totalNeto));
+    if (infoOrden?.idCliente) {
+      const infoCliente = ListClientes.find(
+        (cliente) => cliente._id === infoOrden.idCliente
+      );
+      setInfoPuntosCli(infoCliente);
     }
-  }, [infoOrden]);
+  }, [infoOrden, ListClientes]);
 
   return (
     <>
@@ -190,17 +175,17 @@ const Ticket = React.forwardRef((props, ref) => {
                 {sizePaper80 === false ? (
                   <>
                     <div className="i-negocio">
-                      <span>Horario de Atencion</span>
+                      <span>Horario de atención</span>
                       {InfoNegocio.horario.map((hor, index) => (
                         <span key={index}>{hor.horario}</span>
                       ))}
                     </div>
                     <div className="i-negocio">
-                      <span>Direccion</span>
+                      <span>Dirección</span>
                       <span>{InfoNegocio?.direccion}</span>
                     </div>
                     <div className="i-negocio " style={{ paddingBottom: "0" }}>
-                      <span>Telefono de contacto</span>
+                      <span>Teléfono de contacto</span>
                       <div className="flexd">
                         {InfoNegocio.contacto.map((num, index) => (
                           <span key={index}> {num.numero}</span>
@@ -212,12 +197,12 @@ const Ticket = React.forwardRef((props, ref) => {
                   <table className="info-table">
                     <tbody>
                       <tr>
-                        <td>Direccion:</td>
+                        <td>Direccion :</td>
                         <td>{InfoNegocio?.direccion}</td>
                       </tr>
                       {InfoNegocio.contacto.length > 0 ? (
                         <tr>
-                          <td>Telefono:</td>
+                          <td>Telefono :</td>
                           <td className="u-line">
                             {InfoNegocio.contacto.map((num, index) => (
                               <span key={index}>
@@ -231,7 +216,7 @@ const Ticket = React.forwardRef((props, ref) => {
                         </tr>
                       ) : null}
                       <tr>
-                        <td>Horario:</td>
+                        <td>Horario :</td>
                         <td className="m-line">
                           {InfoNegocio.horario.map((hor, index) => (
                             <span key={index}>{hor.horario}</span>
@@ -256,7 +241,7 @@ const Ticket = React.forwardRef((props, ref) => {
                 <table className="tb-date">
                   <tbody>
                     <tr>
-                      <td>Ingreso:</td>
+                      <td>Ingreso :</td>
                       <td>
                         <div className="date-time">
                           {sizePaper80 ? (
@@ -290,7 +275,7 @@ const Ticket = React.forwardRef((props, ref) => {
                       </td>
                     </tr>
                     <tr>
-                      <td>Entrega:</td>
+                      <td>Entrega :</td>
                       <td>
                         <div className="date-time">
                           {sizePaper80 ? (
@@ -340,12 +325,12 @@ const Ticket = React.forwardRef((props, ref) => {
                       ) : null}
                       {infoOrden.celular ? (
                         <tr className="f-telf">
-                          <td>Telefono : </td>
+                          <td>Teléfono : </td>
                           <td>&nbsp;&nbsp;{infoOrden.celular}</td>
                         </tr>
                       ) : null}
                       <tr className="f-attend">
-                        <td>Atentido por : </td>
+                        <td>Atendido por : </td>
                         <td>&nbsp;&nbsp;{infoOrden.attendedBy.name}</td>
                       </tr>
                     </tbody>
@@ -359,11 +344,11 @@ const Ticket = React.forwardRef((props, ref) => {
                   <thead>
                     <tr>
                       <th></th>
-                      <th>Item</th>
-                      <th>Cantidad</th>
+                      <th>ITEM</th>
+                      <th>{sizePaper80 ? "CANTIDAD" : "CANT"}</th>
                       {!tipoTicket ? (
                         <>
-                          <th>Total</th>
+                          <th>TOTAL</th>
                         </>
                       ) : null}
                     </tr>
@@ -373,13 +358,24 @@ const Ticket = React.forwardRef((props, ref) => {
                       (p) => p.identificador !== getInfoDelivery()?._id
                     ).map((p, index) => (
                       <React.Fragment key={`${infoOrden._id}-${index}`}>
-                        <tr>
-                          <td>•</td>
+                        <tr
+                          className={`${
+                            showDescripcion && p.descripcion ? "no-border" : ""
+                          }`}
+                        >
+                          <td>{sizePaper80 ? "• " : ""}</td>
                           <td>{p.item}</td>
                           <td>{formatThousandsSeparator(p.cantidad)}</td>
                           {!tipoTicket ? (
                             <>
-                              <td>{formatThousandsSeparator(p.total)}</td>
+                              {infoOrden?.descuento.estado &&
+                              infoOrden?.descuento.info &&
+                              infoOrden?.descuento.modoDescuento ===
+                                "Manual" ? (
+                                <td>{formatThousandsSeparator(p.monto)}</td>
+                              ) : (
+                                <td>{formatThousandsSeparator(p.total)}</td>
+                              )}
                             </>
                           ) : null}
                         </tr>
@@ -396,55 +392,75 @@ const Ticket = React.forwardRef((props, ref) => {
                   {!tipoTicket ? (
                     <tfoot>
                       <tr>
-                        <td colSpan="3">Subtotal :</td>
+                        <td>Subtotal :</td>
                         <td>
-                          {formatThousandsSeparator(
-                            infoOrden.Items.reduce(
-                              (total, p) => total + parseFloat(p.total),
-                              0
-                            ) -
-                              (infoOrden?.Modalidad === "Delivery"
-                                ? montoDelivery()
-                                : 0)
-                          )}
+                          {infoOrden?.descuento.estado &&
+                          infoOrden?.descuento.info &&
+                          infoOrden?.descuento.modoDescuento === "Manual"
+                            ? formatThousandsSeparator(
+                                infoOrden?.Items.reduce(
+                                  (total, item) =>
+                                    total + parseFloat(item.monto),
+                                  0
+                                )
+                              )
+                            : formatThousandsSeparator(
+                                infoOrden?.subTotal -
+                                  (infoOrden?.Modalidad === "Delivery"
+                                    ? montoDelivery()
+                                    : 0)
+                              )}
                         </td>
                       </tr>
                       {infoOrden?.Modalidad === "Delivery" ? (
                         <tr>
-                          <td colSpan="3">Delivery :</td>
+                          <td>Delivery :</td>
                           <td>{montoDelivery()}</td>
                         </tr>
                       ) : null}
-
-                      {infoOrden.factura ? (
+                      {infoOrden?.cargosExtras.impuesto.estado ? (
                         <tr>
-                          <td colSpan="3">
+                          <td>
                             {nameImpuesto} (
-                            {infoOrden.cargosExtras.igv.valor * 100} %) :
+                            {infoOrden?.cargosExtras.impuesto.valor * 100} %) :
                           </td>
-                          <td>{infoOrden.cargosExtras.igv.importe}</td>
+                          <td>
+                            {formatThousandsSeparator(
+                              infoOrden?.cargosExtras.impuesto.importe
+                            )}
+                          </td>
                         </tr>
                       ) : null}
                       <tr>
-                        <td colSpan="3">Descuento :</td>
+                        <td>Descuento :</td>
                         <td>
-                          {infoOrden.descuento
-                            ? formatThousandsSeparator(infoOrden.descuento)
-                            : 0}
+                          {infoOrden?.descuento.estado &&
+                          infoOrden?.descuento.info &&
+                          infoOrden?.descuento.modoDescuento === "Manual"
+                            ? formatThousandsSeparator(
+                                infoOrden?.descuento.info.reduce(
+                                  (total, item) =>
+                                    total + parseFloat(item.descuentoMonto),
+                                  0
+                                )
+                              )
+                            : formatThousandsSeparator(
+                                infoOrden.descuento.monto
+                              )}
                         </td>
                       </tr>
                       <tr>
-                        <td colSpan="3">Total a Pagar :</td>
+                        <td>Total a pagar :</td>
                         <td>{formatThousandsSeparator(infoOrden.totalNeto)}</td>
                       </tr>
                       {sPago?.estado === "Incompleto" ? (
                         <>
                           <tr>
-                            <td colSpan="3">A Cuenta :</td>
+                            <td>A cuenta :</td>
                             <td>{formatThousandsSeparator(sPago?.pago)}</td>
                           </tr>
                           <tr>
-                            <td colSpan="3">Deuda Pendiente :</td>
+                            <td>Deuda pendiente :</td>
                             <td>{formatThousandsSeparator(sPago?.falta)}</td>
                           </tr>
                         </>
@@ -452,31 +468,49 @@ const Ticket = React.forwardRef((props, ref) => {
                     </tfoot>
                   ) : null}
                 </table>
-                {infoOrden?.descuento > 0 && !tipoTicket ? (
+                {infoOrden?.descuento.estado &&
+                infoOrden?.descuento.info &&
+                infoOrden?.descuento.modoDescuento !== "Ninguno" &&
+                !tipoTicket ? (
                   <div className="space-ahorro">
                     <h2 className="title">
-                      ! Felicidades Ahorraste
-                      {formatThousandsSeparator(infoOrden?.descuento, true)} ¡
+                      ¡Felicidades Ahorraste&nbsp;
+                      {infoOrden?.descuento.estado &&
+                      infoOrden?.descuento.info &&
+                      infoOrden?.descuento.modoDescuento === "Manual"
+                        ? formatThousandsSeparator(
+                            infoOrden?.descuento.info.reduce(
+                              (total, item) =>
+                                total + parseFloat(item.descuentoMonto),
+                              0
+                            ),
+                            true
+                          )
+                        : formatThousandsSeparator(
+                            infoOrden?.descuento.monto,
+                            true
+                          )}{" "}
+                      ¡
                     </h2>
-                    {infoOrden?.modoDescuento === "Promocion" ? (
+                    {infoOrden?.descuento.modoDescuento === "Promocion" ? (
                       <div className="info-promo">
                         <span>Usando nuestras promociones :</span>
                         <div className="body-ahorro">
                           <div className="list-promo">
                             <ul>
-                              {infoOrden?.cargosExtras.beneficios.promociones.map(
-                                (p) => (
-                                  <li key={p.codigoCupon}>{p.descripcion}</li>
-                                )
-                              )}
+                              <li key={infoOrden?.descuento.info.codigoCupon}>
+                                {infoOrden?.descuento.info.descripcion}
+                              </li>
                             </ul>
                           </div>
-                          <div className="img-pet">
-                            <img src={AhorroPet} alt="" />
-                          </div>
+                          {sizePaper80 ? (
+                            <div className="img-pet">
+                              <img src={AhorroPet} alt="" />
+                            </div>
+                          ) : null}
                         </div>
                       </div>
-                    ) : (
+                    ) : infoOrden?.descuento.modoDescuento === "Puntos" ? (
                       <div className="info-point">
                         <span>Usando nuestro sistema de puntos :</span>
                         <div className="body-ahorro">
@@ -486,7 +520,7 @@ const Ticket = React.forwardRef((props, ref) => {
                                 <span>PUNTOS USADOS</span>
                                 <strong>
                                   {formatThousandsSeparator(
-                                    infoOrden?.cargosExtras.beneficios.puntos
+                                    infoOrden?.descuento.info?.puntosUsados
                                   )}
                                 </strong>
                               </div>
@@ -494,11 +528,34 @@ const Ticket = React.forwardRef((props, ref) => {
                                 <span>PUNTOS RESTANTES</span>
                                 <strong>
                                   {formatThousandsSeparator(
-                                    infoPuntosCli?.scoreTotal
+                                    infoOrden?.descuento.info?.puntosRestantes
                                   )}
                                 </strong>
                               </div>
                             </div>
+                          </div>
+                          {sizePaper80 && (
+                            <div className="img-pet">
+                              <img src={AhorroPet} alt="" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="info-manual">
+                        <span>Descuento directo :</span>
+                        <div className="body-ahorro">
+                          <div className="list-descuentos">
+                            <ul>
+                              {infoOrden?.descuento.info.map((dsc, index) => (
+                                <li key={index}>
+                                  <span>
+                                    {dsc.item}&nbsp; {simboloMoneda}
+                                    {dsc.descuentoPorcentaje}&nbsp; desct.
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
                           </div>
                           {sizePaper80 ? (
                             <div className="img-pet">
@@ -516,12 +573,24 @@ const Ticket = React.forwardRef((props, ref) => {
               <>
                 <div className="monto-final">
                   <h2>Pago : {formatThousandsSeparator(sPago?.pago, true)}</h2>
-                  <h3 className={`${infoOrden.factura ? null : "sf"} estado`}>
+                  <h3
+                    className={`${
+                      infoOrden?.cargosExtras.impuesto.estado ? null : "sf"
+                    } estado`}
+                  >
                     {sPago?.estado.toUpperCase()}
                   </h3>
-                  {infoOrden.factura ? (
+                  {showPuntosOnTicket &&
+                  infoPuntosCli &&
+                  infoOrden?.descuento.modoDescuento !== "Puntos" &&
+                  infoPuntosCli?.scoreTotal !== 0 ? (
+                    <h2 className="points-earned">
+                      Puntos Acumulados : {parseInt(infoPuntosCli?.scoreTotal)}
+                    </h2>
+                  ) : null}
+                  {infoOrden.cargosExtras.impuesto.estado ? (
                     <h2 className="cangeo-factura">
-                      Canjear Orden de Servicio por Factura
+                      Canjear Orden de Servicio por Boleta o Factura
                     </h2>
                   ) : null}
                 </div>
@@ -534,14 +603,9 @@ const Ticket = React.forwardRef((props, ref) => {
                     {listPromos?.map((promo, index) => (
                       <div className="item-promo" key={index}>
                         <div className="info-promo">
-                          <div>
+                          <div className="cod-body">
                             <h1>PROMOCION:</h1>
-                            <h2
-                              style={{
-                                fontSize: "0.8em",
-                                textAlign: "justify",
-                              }}
-                            >
+                            <h2 className="cod-descripcion">
                               {promo.descripcion}
                             </h2>
                             <h2 className="cod-i">
