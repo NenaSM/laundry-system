@@ -540,7 +540,7 @@ const InfoServicios = ({
                           );
                         }}
                         precision={2}
-                        min={0}
+                        min={+values.Items[index].monto}
                         step={1}
                         hideControls
                         autoComplete="off"
