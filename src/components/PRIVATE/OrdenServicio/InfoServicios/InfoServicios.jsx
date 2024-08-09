@@ -497,6 +497,7 @@ const InfoServicios = ({
                           }}
                           precision={2}
                           min={0}
+                          max={+values.Items[index].monto}
                           step={1}
                           hideControls
                           autoComplete="off"

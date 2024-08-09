@@ -340,7 +340,26 @@ const OrdenServicio = ({ mode, onAction, infoDefault, titleMode }) => {
         monto: 0,
       };
     } else {
-      descuentoUpdated = data.descuento;
+      if (data.descuento.modoDescuento === "Manual") {
+        if (!data.descuento.info.some((item) => item.descuentoMonto > 0)) {
+          descuentoUpdated = {
+            estado: false,
+            modoDescuento: "Ninguno",
+            info: null,
+            monto: 0,
+          };
+        } else {
+          const newInfo = data.descuento.info.filter(
+            (item) => item.descuentoMonto > 0
+          );
+          descuentoUpdated = {
+            ...data.descuento,
+            info: newInfo,
+          };
+        }
+      } else {
+        descuentoUpdated = data.descuento;
+      }
     }
 
     let cargosExtrasUpdated;
