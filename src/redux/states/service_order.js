@@ -26,7 +26,7 @@ const service_order = createSlice({
     orderServiceId: false,
     // filtros
     filterBy: "pendiente",
-    searhOptionByOthers: "date",
+    searhOptionByOthers: "last",
     selectedMonth: moment().toDate(),
     // ----------------- //
     isLoading: false,
